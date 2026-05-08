@@ -15,13 +15,18 @@ export default function ChatPage() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
+  const activeIdRef = useRef(null);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
   const [presence, setPresence] = useState({}); // user_id -> bool
   const [typingByConv, setTypingByConv] = useState({}); // cid -> {user_id, name, timer}
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [forwardMsg, setForwardMsg] = useState(null);
-  const [messageHandler, setMessageHandler] = useState(() => () => {});
+  const messageHandlerRef = useRef(() => {});
+  const registerMessageHandler = useCallback((fn) => {
+    messageHandlerRef.current = fn || (() => {});
+  }, []);
   const socketRef = useRef(null);
 
   const loadConversations = useCallback(async () => {
@@ -42,19 +47,19 @@ export default function ChatPage() {
           setPresence((p) => ({ ...p, [evt.user_id]: evt.online }));
         } else if (evt.type === "message") {
           // bubble to active chat handler
-          messageHandler(evt);
+          messageHandlerRef.current?.(evt);
           // update conversations preview
           setConversations((cs) => {
             const idx = cs.findIndex((c) => c.id === evt.conversation_id);
             if (idx === -1) { loadConversations(); return cs; }
             const conv = { ...cs[idx], last_message: evt.data.text || `[${evt.data.type}]`, last_message_at: evt.data.created_at };
-            if (evt.data.sender_id !== user.id && activeId !== evt.conversation_id) {
+            if (evt.data.sender_id !== user?.id && activeIdRef.current !== evt.conversation_id) {
               conv.unread = (conv.unread || 0) + 1;
             }
             const out = [...cs]; out.splice(idx, 1); return [conv, ...out];
           });
         } else if (evt.type === "message_deleted") {
-          messageHandler(evt);
+          messageHandlerRef.current?.(evt);
         } else if (evt.type === "typing") {
           setTypingByConv((t) => {
             const next = { ...t };
@@ -72,7 +77,7 @@ export default function ChatPage() {
     socketRef.current = sock;
     return () => sock.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messageHandler, activeId, user?.id]);
+  }, []);
 
   // typing auto-clear
   useEffect(() => {
@@ -135,7 +140,7 @@ export default function ChatPage() {
             typing={typingByConv[activeConv.id]}
             onBack={() => setActiveId(null)}
             socket={socketRef.current}
-            registerMessageHandler={(fn) => setMessageHandler(() => fn)}
+            registerMessageHandler={registerMessageHandler}
             onForward={(msg) => setForwardMsg(msg)}
           />
         ) : (

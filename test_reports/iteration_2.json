@@ -1,0 +1,38 @@
+{
+  "summary": "RETEST after render-loop fix in /app/frontend/src/pages/ChatPage.jsx — ALL 9 frontend e2e steps PASS. Render-loop ('Maximum update depth exceeded') is GONE: opening a DM, sending text, attach menu, bubble dropdown, group creation, sidebar update, and logout all work end-to-end. Backend tests skipped per request (already 13/13 in iteration_1).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Composer / btn-send",
+        "issue": "MINOR: 'Made with Emergent' badge (id=emergent-badge) at bottom-right overlaps the send button (data-testid=\"btn-send\") at viewport widths around 1440px. Real users can still click thanks to z-index, but Playwright's actionability check sees it as intercepted. Workaround used: JS .click(). Recommend giving Composer right-padding when badge is present, or moving send button further from the corner.",
+        "selector": "[data-testid=\"btn-send\"]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_2.json",
+    "/app/test_reports/iteration_1.json",
+    "/app/backend/tests/test_aasha_api.py"
+  ],
+  "action_items": [
+    "(Optional) Add right-padding to Composer or shift btn-send so the Emergent badge doesn't visually overlap on desktop. Functionality unaffected.",
+    "Render-loop fix verified — ChatPage.jsx changes (messageHandlerRef + useCallback + activeIdRef) are correct and stable. No further action required."
+  ],
+  "critical_code_review_comments": [
+    "ChatPage.jsx: useCallback([]) on registerMessageHandler and ref-based handler swap is the right pattern. Stale-closure for activeId is correctly avoided via activeIdRef. No regressions observed.",
+    "ChatWindow.jsx still keeps registerMessageHandler in its useEffect deps — fine because the parent's callback is now stable, but consider replacing with a context-based dispatcher long-term to avoid re-arming on conversation.id changes (currently re-registers on every conv switch, which is acceptable).",
+    "Composer btn-send is partially obscured by Emergent badge at 1440px viewport. Pure visual issue, click works programmatically."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (13/13 from iteration_1, not re-run)", "frontend": "100% (9/9 e2e steps passed)"},
+  "test_credentials": "alice@example.com / password123, bob@example.com / password123",
+  "seed_data_creation": "Created during e2e: 1 text message in Alice↔Bob DM ('e2e-msg-<ts>') and one group conversation 'E2E-Group-<ts>' with Bob as member. Not cleaned up (acceptable for preview env).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Frontend e2e fully green after render-loop fix. Only minor cosmetic issue: Emergent badge overlaps btn-send at desktop widths — Playwright must use JS click or force=True to interact. To run tests: login alice@example.com / password123, use search-users with 'Bob' to start DM, click 'user-<uuid>' inside dialog-new-chat (the bare prefix '[data-testid^=\"user-\"]' also matches user-avatar so always scope inside the dialog).",
+  "rca_of_the_issue": "Previous render-loop RCA (iteration_1) was correct. Fix applied in ChatPage.jsx: (1) messageHandlerRef = useRef(()=>{}) replaces useState handler, (2) registerMessageHandler = useCallback((fn)=>{ messageHandlerRef.current = fn || (()=>{}); }, []) — stable identity, (3) activeIdRef captures activeId for use inside socket onMessage to avoid stale closure. Verified at runtime: 0 'Maximum update depth' errors during full 9-step e2e run."
+}
