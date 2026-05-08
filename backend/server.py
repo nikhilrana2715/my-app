@@ -342,34 +342,63 @@ async def ensure_dm(user_a: str, user_b: str) -> dict:
     await db.conversations.insert_one(doc)
     return doc
 
-async def hydrate_conv(conv: dict, current_uid: str) -> dict:
+async def hydrate_conv(conv: dict, current_uid: str,
+                       users_by_id: Optional[Dict[str, dict]] = None,
+                       unread_by_cid: Optional[Dict[str, int]] = None) -> dict:
     out = {**conv}
     out.pop("_id", None)
     if not conv["is_group"]:
         other_id = next((m for m in conv["members"] if m != current_uid), None)
         if other_id:
-            other = await db.users.find_one({"id": other_id}, {"_id": 0, "password_hash": 0})
+            other = (users_by_id.get(other_id) if users_by_id is not None
+                     else await db.users.find_one({"id": other_id}, {"_id": 0, "password_hash": 0}))
             if other:
                 out["name"] = other["name"]
                 out["avatar"] = other.get("avatar")
                 out["other_user"] = public_user(other)
     # Get member previews (for groups)
     if conv["is_group"]:
-        ms = await db.users.find({"id": {"$in": conv["members"]}}, {"_id": 0, "password_hash": 0}).to_list(100)
+        if users_by_id is not None:
+            ms = [users_by_id[m] for m in conv["members"] if m in users_by_id]
+        else:
+            ms = await db.users.find({"id": {"$in": conv["members"]}}, {"_id": 0, "password_hash": 0}).to_list(100)
         out["member_users"] = [public_user(m) for m in ms]
     # Unread count
-    unread = await db.messages.count_documents({
-        "conversation_id": conv["id"],
-        "sender_id": {"$ne": current_uid},
-        "read_by": {"$ne": current_uid}
-    })
-    out["unread"] = unread
+    if unread_by_cid is not None:
+        out["unread"] = unread_by_cid.get(conv["id"], 0)
+    else:
+        out["unread"] = await db.messages.count_documents({
+            "conversation_id": conv["id"],
+            "sender_id": {"$ne": current_uid},
+            "read_by": {"$ne": current_uid}
+        })
     return out
 
 @api.get("/conversations")
 async def list_conversations(user=Depends(current_user)):
     convs = await db.conversations.find({"members": user["id"]}, {"_id": 0}).sort("last_message_at", -1).to_list(200)
-    return [await hydrate_conv(c, user["id"]) for c in convs]
+    if not convs:
+        return []
+    # Batch: collect all member ids across all conversations
+    all_member_ids = {m for c in convs for m in c.get("members", [])}
+    users_list = await db.users.find({"id": {"$in": list(all_member_ids)}},
+                                      {"_id": 0, "password_hash": 0}).to_list(len(all_member_ids))
+    users_by_id = {u["id"]: u for u in users_list}
+    # Batch: aggregate unread counts per conversation in one query
+    cids = [c["id"] for c in convs]
+    pipeline = [
+        {"$match": {
+            "conversation_id": {"$in": cids},
+            "sender_id": {"$ne": user["id"]},
+            "read_by": {"$ne": user["id"]},
+            "deleted": {"$ne": True},
+        }},
+        {"$group": {"_id": "$conversation_id", "count": {"$sum": 1}}},
+    ]
+    unread_by_cid: Dict[str, int] = {}
+    async for row in db.messages.aggregate(pipeline):
+        unread_by_cid[row["_id"]] = row["count"]
+    return [await hydrate_conv(c, user["id"], users_by_id, unread_by_cid) for c in convs]
 
 @api.post("/conversations")
 async def create_conversation(body: CreateConvIn, user=Depends(current_user)):
@@ -397,10 +426,12 @@ async def get_conversation(cid: str, user=Depends(current_user)):
     return await hydrate_conv(conv, user["id"])
 
 # ---------- Messages ----------
-async def hydrate_message(msg: dict) -> dict:
+async def hydrate_message(msg: dict, files_by_id: Optional[Dict[str, dict]] = None) -> dict:
     out = {k: v for k, v in msg.items() if k != "_id"}
-    if msg.get("file_id"):
-        f = await db.files.find_one({"id": msg["file_id"]}, {"_id": 0})
+    fid = msg.get("file_id")
+    if fid:
+        f = (files_by_id.get(fid) if files_by_id is not None
+             else await db.files.find_one({"id": fid}, {"_id": 0}))
         if f:
             out["file"] = {"id": f["id"], "name": f["original_filename"],
                            "size": f["size"], "content_type": f["content_type"],
@@ -422,7 +453,13 @@ async def list_messages(cid: str, before: Optional[str] = None, limit: int = 50,
         {"conversation_id": cid, "sender_id": {"$ne": user["id"]}, "read_by": {"$ne": user["id"]}},
         {"$addToSet": {"read_by": user["id"]}}
     )
-    return [await hydrate_message(m) for m in msgs]
+    # Batch: fetch all referenced files in one query
+    file_ids = [m["file_id"] for m in msgs if m.get("file_id")]
+    files_by_id: Dict[str, dict] = {}
+    if file_ids:
+        async for f in db.files.find({"id": {"$in": list(set(file_ids))}}, {"_id": 0}):
+            files_by_id[f["id"]] = f
+    return [await hydrate_message(m, files_by_id) for m in msgs]
 
 async def _create_and_broadcast_message(payload: dict, sender: dict) -> dict:
     cid = payload["conversation_id"]
