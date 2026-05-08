@@ -1,0 +1,140 @@
+{
+  "theme_archetype": {
+    "domain": "Messaging/Social",
+    "theme": "Light",
+    "archetype": "1 (Organic & Earthy) / Warm Dawn",
+    "reasoning": "Aasha means 'Hope'. We avoid the cold, clinical feel of standard chat apps and use a warm, optimistic palette (cream, sunrise orange) with soft typography to create a safe, inviting, and human-centric space."
+  },
+  "typography": {
+    "headings": {
+      "family": "Cabinet Grotesk, sans-serif",
+      "weights": ["500", "700", "800"],
+      "tracking": "tracking-tight",
+      "usage": "Auth screens, empty states, profile names, group names."
+    },
+    "body": {
+      "family": "Manrope, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "Chat bubbles, lists, timestamps, standard UI text. Chosen for high legibility and friendly rounded geometry."
+    }
+  },
+  "colors": {
+    "background": {
+      "app": "#FCFBF8",
+      "sidebar": "#F5F3ED",
+      "chat_window": "#FCFBF8",
+      "surface": "#FFFFFF"
+    },
+    "primary": {
+      "DEFAULT": "#F26C4F",
+      "hover": "#E05A3D",
+      "light": "#F9E0D9",
+      "text": "#FFFFFF"
+    },
+    "text": {
+      "primary": "#2C2A29",
+      "secondary": "#7A7571",
+      "muted": "#A39E98",
+      "inverse": "#FFFFFF"
+    },
+    "border": {
+      "DEFAULT": "#E6E3DB",
+      "divider": "#F0EFEB"
+    },
+    "chat_bubbles": {
+      "sent": {
+        "bg": "#F26C4F",
+        "text": "#FFFFFF",
+        "time": "rgba(255, 255, 255, 0.7)"
+      },
+      "received": {
+        "bg": "#FFFFFF",
+        "text": "#2C2A29",
+        "time": "#A39E98",
+        "border": "#E6E3DB"
+      }
+    },
+    "status": {
+      "online": "#48B07D",
+      "offline": "#A39E98",
+      "read_tick": "#4A90E2",
+      "sent_tick": "#A39E98",
+      "error": "#E64545"
+    }
+  },
+  "layout_spacing": {
+    "grid": {
+      "desktop": "grid-cols-[320px_1fr] or grid-cols-[360px_1fr] for large screens",
+      "mobile": "grid-cols-1"
+    },
+    "chat_bubble": {
+      "max_width": "max-w-[85%] md:max-w-[70%]",
+      "radius_sent": "rounded-2xl rounded-br-sm",
+      "radius_received": "rounded-2xl rounded-bl-sm",
+      "padding": "px-4 py-2.5"
+    },
+    "composer": {
+      "radius": "rounded-full",
+      "padding": "px-4 py-3"
+    }
+  },
+  "component_rules": {
+    "buttons": "Shadcn Button heavily customized. Primary uses sunrise orange. Pill-shaped (rounded-full) for primary actions. Use smooth shadow on hover.",
+    "cards": "File/Media attachments inside chat must have rounded-xl borders, subtle 1px border (#E6E3DB), no heavy drop shadows. Go flat.",
+    "dialogs": "Use Shadcn Dialog for New Chat, Group Creation, Settings. Backdrop blur is mandatory (backdrop-blur-sm bg-black/30). Dialog surface is #FCFBF8.",
+    "dropdowns": "Shadcn DropdownMenu for message actions (Forward, Share, Delete). Keep animations snappy.",
+    "avatars": "Shadcn Avatar. Always circle. Online indicator is a 12px circle with a 2px white border positioned at bottom-right.",
+    "icons": "lucide-react. Stroke width 2px for clarity. Use standard icons: Paperclip, Send, Mic, Image, FileText, MapPin, MoreVertical.",
+    "inputs": "Shadcn Input. Strip away standard focus rings. Use subtle background (#FFFFFF) with 1px border. On focus, change border to #F26C4F."
+  },
+  "motion_interactions": {
+    "page_transitions": "Framer Motion. Fade and slight slide-up (y: 10 -> 0, opacity 0 -> 1, duration: 0.3s).",
+    "chat_bubbles": "Scale in from the origin corner. Sent (origin-bottom-right), Received (origin-bottom-left). Spring animation for organic bounciness.",
+    "hover_states": "Sidebar items should have a soft background transition (bg-transparent to bg-white) with scale 0.98 on tap.",
+    "menus": "Context menus should use scale and opacity fade-in."
+  },
+  "media": {
+    "auth_background": [
+      {
+        "url": "https://images.unsplash.com/photo-1773083405725-721c720ab2de?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwxfHx3YXJtJTIwc3VucmlzZSUyMHNreSUyMG1pbmltYWx8ZW58MHx8fHwxNzc4MjA5MTg4fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Warm sunrise sky over ocean. Use as a blurred or soft background overlay for the Login/Signup screen."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1775813597055-fe49c507d56b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHx3YXJtJTIwc3VucmlzZSUyMHNreSUyMG1pbmltYWx8ZW58MHx8fHwxNzc4MjA5MTg4fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract swirling sunrise clouds. Good for splash screen or loading states."
+      }
+    ],
+    "onboarding_images": [
+      {
+        "url": "https://images.unsplash.com/photo-1633504564362-9097e06b1934?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwxfHxmcmllbmRseSUyMHBlcnNvbiUyMHRleHRpbmclMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzgyMDkxODh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Friendly woman texting. Use in onboarding carousel."
+      }
+    ],
+    "empty_states": [
+      {
+        "url": "https://images.unsplash.com/photo-1776993800059-3c9adeb67c19?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMHdhcm0lMjBjbGVhbiUyMHNwYWNlJTIwbWluaW1hbHxlbnwwfHx8fDE3NzgyMDkyMDN8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Empty sunlit hallway. Use as a soft background or visual for 'No chats selected'."
+      }
+    ],
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1707396172424-f3293f788364?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwyfHxhdmF0YXIlMjBwb3J0cmFpdCUyMG1pbmltYWx8ZW58MHx8fHwxNzc4MjA5MjA0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Mock user avatar 1"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1738901749230-19c588c49c52?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwzfHxhdmF0YXIlMjBwb3J0cmFpdCUyMG1pbmltYWx8ZW58MHx8fHwxNzc4MjA5MjA0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Mock user avatar 2"
+      }
+    ]
+  },
+  "testing_guidelines": {
+    "attributes": "All interactive elements MUST use data-testid. Examples: data-testid='chat-list-item', data-testid='message-input', data-testid='send-button', data-testid='attach-file-button'."
+  },
+  "specific_feature_guidelines": {
+    "file_attachments": "Display files (PDF, DOC, ZIP) as distinct horizontal cards within the chat bubble. Left icon (document type), center filename/size, right download icon. Max width constraint.",
+    "media_grid": "When sending multiple images, use a bento-box style grid. 2 images: side-by-side. 3 images: 1 large on top, 2 small on bottom.",
+    "links": "Auto-detect links and render a preview card with a grey/white background inside the bubble, showing the title, description, and domain.",
+    "location": "Render location pins as small map snapshot cards. Left side has a MapPin icon on a muted background, right side shows 'Location Shared' with Lat/Lng or generic address.",
+    "chat_list": "Unread badges should use the primary color (#F26C4F) with white text. Avatars of groups should use a 2x2 grid of participant avatars if image is missing."
+  }
+}
