@@ -1,0 +1,12 @@
+{
+  "short_name": "Aasha",
+  "name": "Aasha — simple, warm chat",
+  "description": "Lightweight chat with messages, files, and groups.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FCFBF8",
+  "theme_color": "#F26C4F",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" }
+  ]
+}
