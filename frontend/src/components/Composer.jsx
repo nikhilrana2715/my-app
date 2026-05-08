@@ -63,7 +63,7 @@ export default function Composer({ onSend, onTyping }) {
   };
 
   return (
-    <div className="border-t border-aasha-line bg-white px-3 py-3" data-testid="composer">
+    <div className="border-t border-aasha-line bg-white px-3 py-3 pr-3 sm:pr-[210px] md:pr-[210px] lg:pr-3" data-testid="composer">
       <div className="flex items-end gap-2 max-w-5xl mx-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
