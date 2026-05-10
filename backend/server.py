@@ -651,6 +651,35 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
                 await websocket.send_json({"type": "pong"})
             elif t in ("call_offer", "call_answer", "call_ice", "call_end", "call_reject", "call_ringing"):
                 target_id = evt.get("to")
+                call_id = evt.get("call_id")
+                # Log call lifecycle
+                try:
+                    if t == "call_offer" and call_id and target_id:
+                        await db.call_logs.insert_one({
+                            "id": call_id, "caller_id": uid, "callee_id": target_id,
+                            "kind": evt.get("kind", "audio"), "status": "ringing",
+                            "started_at": now_iso(), "answered_at": None,
+                            "ended_at": None, "duration_sec": 0,
+                        })
+                    elif t == "call_answer" and call_id:
+                        await db.call_logs.update_one({"id": call_id},
+                            {"$set": {"status": "connected", "answered_at": now_iso()}})
+                    elif t == "call_end" and call_id:
+                        log = await db.call_logs.find_one({"id": call_id}, {"_id": 0})
+                        if log:
+                            started = log.get("answered_at") or log.get("started_at")
+                            try:
+                                dur = int((datetime.now(timezone.utc) - datetime.fromisoformat(started)).total_seconds())
+                            except Exception:
+                                dur = 0
+                            new_status = "completed" if log.get("status") == "connected" else "missed"
+                            await db.call_logs.update_one({"id": call_id},
+                                {"$set": {"status": new_status, "ended_at": now_iso(), "duration_sec": max(0, dur)}})
+                    elif t == "call_reject" and call_id:
+                        await db.call_logs.update_one({"id": call_id},
+                            {"$set": {"status": "declined", "ended_at": now_iso()}})
+                except Exception as e:
+                    logger.error(f"call_log error: {e}")
                 if target_id:
                     payload = {**evt, "from": uid, "from_name": user["name"],
                                "from_avatar": user.get("avatar")}
@@ -667,6 +696,27 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
                 await manager.send(p, {"type": "presence", "user_id": uid, "online": False})
 
 # ---------- Misc ----------
+@api.get("/calls")
+async def list_calls(user=Depends(current_user)):
+    logs = await db.call_logs.find(
+        {"$or": [{"caller_id": user["id"]}, {"callee_id": user["id"]}]},
+        {"_id": 0}
+    ).sort("started_at", -1).limit(100).to_list(100)
+    peer_ids = set()
+    for log in logs:
+        peer = log["callee_id"] if log["caller_id"] == user["id"] else log["caller_id"]
+        peer_ids.add(peer)
+    users_list = await db.users.find({"id": {"$in": list(peer_ids)}},
+                                      {"_id": 0, "password_hash": 0}).to_list(len(peer_ids) or 1)
+    by_id = {u["id"]: u for u in users_list}
+    out = []
+    for log in logs:
+        is_outgoing = log["caller_id"] == user["id"]
+        peer_id = log["callee_id"] if is_outgoing else log["caller_id"]
+        peer = by_id.get(peer_id) or {"id": peer_id, "name": "Unknown", "email": ""}
+        out.append({**log, "is_outgoing": is_outgoing, "peer": public_user(peer)})
+    return out
+
 @api.get("/")
 async def root():
     return {"app": "Aasha", "status": "ok", "time": now_iso()}
@@ -683,6 +733,10 @@ async def on_start():
         await db.messages.create_index([("conversation_id", 1), ("created_at", -1)])
         await db.messages.create_index("id", unique=True)
         await db.files.create_index("id", unique=True)
+        await db.call_logs.create_index([("started_at", -1)])
+        await db.call_logs.create_index("caller_id")
+        await db.call_logs.create_index("callee_id")
+        await db.call_logs.create_index("id", unique=True)
     except Exception as e:
         logger.error(f"Index creation: {e}")
     init_storage()

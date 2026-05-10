@@ -103,3 +103,10 @@ A WhatsApp-like, lightweight, simple chat app called **Aasha** (आशा — "H
 4. **📲 OTP UX clarified** — Phone tab now shows a "Demo" banner explaining that real SMS isn't connected; clicking "Send OTP" auto-fills `123456` so user can verify in one tap.
 5. **🖼️ Profile DP upload** — Profile dialog now has a Camera button on the avatar that uploads the photo via `/api/files/upload`. Stored as `aasha-file://<id>` and `UserAvatar` resolves it to an authenticated download URL (`?auth=<jwt>`) so other users see your DP too.
 
+
+---
+
+## Iteration 4 (Feb 2026) — Call History
+- ✅ **Calls tab in sidebar**: Toggle between "Chats" and "Calls". Calls panel shows recent call_logs with peer avatar, direction (incoming/outgoing/missed/declined), kind (audio/video icon), duration, and time. Tap-to-callback button on each row.
+- ✅ Backend: New `call_logs` collection. WS handlers auto-log lifecycle: `call_offer` → ringing, `call_answer` → connected, `call_end` → completed (or missed if never connected), `call_reject` → declined. Endpoint: `GET /api/calls`.
+- ✅ Indexes added on `call_logs`: id (unique), caller_id, callee_id, started_at desc.

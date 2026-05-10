@@ -21,6 +21,7 @@ export function CallProvider({ children, currentUser }) {
   const remoteStreamRef = useRef(null);
   const pendingIceRef = useRef([]);
   const callKindRef = useRef(null);
+  const callIdRef = useRef(null);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [muted, setMuted] = useState(false);
@@ -37,6 +38,7 @@ export function CallProvider({ children, currentUser }) {
     }
     remoteStreamRef.current = null;
     pendingIceRef.current = [];
+    callIdRef.current = null;
     setLocalStream(null);
     setRemoteStream(null);
     setMuted(false);
@@ -50,7 +52,7 @@ export function CallProvider({ children, currentUser }) {
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         const peerId = stateRef.current?.peer?.id;
-        if (peerId) getSocket()?.send({ type: "call_ice", to: peerId, candidate: e.candidate });
+        if (peerId) getSocket()?.send({ type: "call_ice", to: peerId, call_id: callIdRef.current, candidate: e.candidate });
       }
     };
     pc.ontrack = (e) => {
@@ -87,6 +89,8 @@ export function CallProvider({ children, currentUser }) {
   const startCall = useCallback(async (peer, kind = "audio") => {
     if (state.status !== "idle") return;
     callKindRef.current = kind;
+    const cid = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `call_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    callIdRef.current = cid;
     setState({ status: "calling", kind, peer, mediaError: null });
     try {
       const stream = await acquireMedia(kind);
@@ -94,7 +98,7 @@ export function CallProvider({ children, currentUser }) {
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      getSocket()?.send({ type: "call_offer", to: peer.id, kind, sdp: offer });
+      getSocket()?.send({ type: "call_offer", to: peer.id, call_id: cid, kind, sdp: offer });
     } catch (e) {
       toast.error("Could not access mic/camera");
       cleanup();
@@ -105,6 +109,7 @@ export function CallProvider({ children, currentUser }) {
     const peer = { id: offerEvt.from, name: offerEvt.from_name, avatar: offerEvt.from_avatar };
     const kind = offerEvt.kind || "audio";
     callKindRef.current = kind;
+    callIdRef.current = offerEvt.call_id;
     setState({ status: "in-call", kind, peer, mediaError: null });
     try {
       const stream = await acquireMedia(kind);
@@ -118,23 +123,25 @@ export function CallProvider({ children, currentUser }) {
       pendingIceRef.current = [];
       const ans = await pc.createAnswer();
       await pc.setLocalDescription(ans);
-      getSocket()?.send({ type: "call_answer", to: peer.id, sdp: ans });
+      getSocket()?.send({ type: "call_answer", to: peer.id, call_id: offerEvt.call_id, sdp: ans });
     } catch (e) {
       toast.error("Could not accept call");
-      getSocket()?.send({ type: "call_reject", to: peer.id });
+      getSocket()?.send({ type: "call_reject", to: peer.id, call_id: offerEvt.call_id });
       cleanup();
     }
   }, [ensurePeer, cleanup]);
 
   const rejectCall = useCallback((evt) => {
     const peerId = evt?.from || stateRef.current?.peer?.id;
-    if (peerId) getSocket()?.send({ type: "call_reject", to: peerId });
+    const cid = evt?.call_id || callIdRef.current;
+    if (peerId) getSocket()?.send({ type: "call_reject", to: peerId, call_id: cid });
     cleanup();
   }, [cleanup]);
 
   const endCall = useCallback((notify = true) => {
     const peerId = stateRef.current?.peer?.id;
-    if (notify && peerId) getSocket()?.send({ type: "call_end", to: peerId });
+    const cid = callIdRef.current;
+    if (notify && peerId) getSocket()?.send({ type: "call_end", to: peerId, call_id: cid });
     cleanup();
   }, [cleanup]);
 

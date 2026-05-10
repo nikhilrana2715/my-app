@@ -4,12 +4,14 @@ import { useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Search, Plus, Users, MessageSquarePlus, MoreVertical, LogOut, User as UserIcon, Sparkles } from "lucide-react";
+import { Search, Plus, Users, MessageSquarePlus, MoreVertical, LogOut, User as UserIcon, Sparkles, MessageCircle, Phone } from "lucide-react";
 import { formatChatTime } from "@/lib/utils";
+import CallsPanel from "@/components/CallsPanel";
 
 export default function Sidebar({ conversations, activeId, presence, typing, onSelect, onNewChat, onNewGroup, onProfile }) {
   const { user, logout } = useAuth();
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState("chats");
   const filtered = conversations.filter((c) => (c.name || "").toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -57,18 +59,45 @@ export default function Sidebar({ conversations, activeId, presence, typing, onS
       </div>
 
       <div className="px-4 pb-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aasha-inkMuted" />
-          <Input
-            data-testid="search-input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search chats"
-            className="pl-9 bg-white border-aasha-line rounded-full h-10"
-          />
+        <div className="flex items-center gap-1 bg-white border border-aasha-line rounded-full p-1 mb-2">
+          <button
+            onClick={() => setTab("chats")}
+            data-testid="tab-chats"
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-full text-sm py-1.5 font-semibold transition-all ${
+              tab === "chats" ? "bg-aasha-orange text-white" : "text-aasha-inkSoft hover:text-aasha-ink"
+            }`}
+          >
+            <MessageCircle className="w-3.5 h-3.5" /> Chats
+          </button>
+          <button
+            onClick={() => setTab("calls")}
+            data-testid="tab-calls"
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-full text-sm py-1.5 font-semibold transition-all ${
+              tab === "calls" ? "bg-aasha-orange text-white" : "text-aasha-inkSoft hover:text-aasha-ink"
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5" /> Calls
+          </button>
         </div>
+        {tab === "chats" && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aasha-inkMuted" />
+            <Input
+              data-testid="search-input"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search chats"
+              className="pl-9 bg-white border-aasha-line rounded-full h-10"
+            />
+          </div>
+        )}
       </div>
 
+      {tab === "calls" ? (
+        <div className="flex-1 overflow-hidden">
+          <CallsPanel />
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         {filtered.length === 0 ? (
           <div className="text-center text-sm text-aasha-inkSoft mt-12 px-6">
@@ -111,6 +140,7 @@ export default function Sidebar({ conversations, activeId, presence, typing, onS
           );
         })}
       </div>
+      )}
 
       <div className="border-t border-aasha-line p-3 flex items-center gap-2 bg-aasha-sidebar">
         <UserAvatar user={user} size={36} />
