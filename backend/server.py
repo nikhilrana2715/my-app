@@ -649,6 +649,12 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
                                                     "is_typing": bool(evt.get("is_typing"))})
             elif t == "ping":
                 await websocket.send_json({"type": "pong"})
+            elif t in ("call_offer", "call_answer", "call_ice", "call_end", "call_reject", "call_ringing"):
+                target_id = evt.get("to")
+                if target_id:
+                    payload = {**evt, "from": uid, "from_name": user["name"],
+                               "from_avatar": user.get("avatar")}
+                    await manager.send(target_id, payload)
     except WebSocketDisconnect:
         pass
     except Exception as e:

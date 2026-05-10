@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { api, formatErr } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useCall } from "@/lib/call";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import MessageBubble from "@/components/MessageBubble";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 
 export default function ChatWindow({ conversation, presence, typing, onBack, socket, registerMessageHandler, onForward }) {
   const { user } = useAuth();
+  const { startCall } = useCall() || {};
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef(null);
@@ -71,6 +73,13 @@ export default function ChatWindow({ conversation, presence, typing, onBack, soc
 
   const otherMembersCount = (conversation.members?.length || 2) - 1;
 
+  const initiateCall = (kind) => {
+    if (conversation.is_group) { toast.info("Group calls not supported yet — only 1-on-1"); return; }
+    const peer = conversation.other_user;
+    if (!peer) return toast.error("Cannot call this user");
+    startCall?.(peer, kind);
+  };
+
   return (
     <div className="flex flex-col h-full bg-aasha-bg" data-testid="chat-window">
       {/* Header */}
@@ -91,8 +100,8 @@ export default function ChatWindow({ conversation, presence, typing, onBack, soc
                 : isOnline ? "Online" : "Offline"}
           </div>
         </div>
-        <Button variant="ghost" size="icon" className="rounded-full hidden sm:inline-flex" disabled><Phone className="w-4 h-4" /></Button>
-        <Button variant="ghost" size="icon" className="rounded-full hidden sm:inline-flex" disabled><Video className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" className="rounded-full hidden sm:inline-flex" onClick={() => initiateCall("audio")} data-testid="btn-call-audio"><Phone className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" className="rounded-full hidden sm:inline-flex" onClick={() => initiateCall("video")} data-testid="btn-call-video"><Video className="w-4 h-4" /></Button>
         <Button variant="ghost" size="icon" className="rounded-full" disabled><Search className="w-4 h-4" /></Button>
         <Button variant="ghost" size="icon" className="rounded-full" disabled><MoreVertical className="w-4 h-4" /></Button>
       </div>

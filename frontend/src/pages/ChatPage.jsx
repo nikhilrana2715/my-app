@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { api, formatErr } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ChatSocket } from "@/lib/socket";
+import { CallProvider, useCall } from "@/lib/call";
 import Sidebar from "@/components/Sidebar";
 import ChatWindow from "@/components/ChatWindow";
 import EmptyState from "@/components/EmptyState";
@@ -9,10 +10,12 @@ import NewChatDialog from "@/components/NewChatDialog";
 import NewGroupDialog from "@/components/NewGroupDialog";
 import ProfileDialog from "@/components/ProfileDialog";
 import ForwardDialog from "@/components/ForwardDialog";
+import CallModal from "@/components/CallModal";
 import { toast } from "sonner";
 
-export default function ChatPage() {
+function ChatPageInner() {
   const { user } = useAuth();
+  const call = useCall();
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const activeIdRef = useRef(null);
@@ -60,6 +63,8 @@ export default function ChatPage() {
           });
         } else if (evt.type === "message_deleted") {
           messageHandlerRef.current?.(evt);
+        } else if (evt.type?.startsWith("call_")) {
+          call?.handleSignal(evt);
         } else if (evt.type === "typing") {
           setTypingByConv((t) => {
             const next = { ...t };
@@ -75,7 +80,9 @@ export default function ChatPage() {
     });
     sock.connect();
     socketRef.current = sock;
-    return () => sock.disconnect();
+    // expose for CallProvider signaling
+    if (typeof window !== "undefined") window.__aashaSocket = sock;
+    return () => { sock.disconnect(); if (typeof window !== "undefined") window.__aashaSocket = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -152,6 +159,16 @@ export default function ChatPage() {
       <NewGroupDialog open={newGroupOpen} onOpenChange={setNewGroupOpen} onCreate={createGroup} />
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
       <ForwardDialog open={!!forwardMsg} onOpenChange={(o) => !o && setForwardMsg(null)} message={forwardMsg} conversations={conversations} />
+      <CallModal />
     </div>
+  );
+}
+
+export default function ChatPage() {
+  const { user } = useAuth();
+  return (
+    <CallProvider currentUser={user}>
+      <ChatPageInner />
+    </CallProvider>
   );
 }

@@ -42,7 +42,8 @@ export default function AuthPage() {
     try {
       await api.post("/auth/otp/send", { phone });
       setOtpSent(true);
-      toast.success("OTP sent — enter any 6-digit code (mock)");
+      setOtp("123456"); // pre-fill demo OTP for convenience
+      toast.success("Demo OTP: 123456 — any 6-digit code will work");
     } catch (err) { toast.error(formatErr(err)); }
     finally { setLoading(false); }
   };
@@ -141,6 +142,9 @@ export default function AuthPage() {
             </TabsContent>
 
             <TabsContent value="phone" className="mt-5">
+              <div className="rounded-xl bg-aasha-orangeLight/60 border border-aasha-orange/30 px-3 py-2 text-xs text-aasha-ink mb-3">
+                <span className="font-semibold">Demo:</span> Real SMS abhi enabled nahi hai. Send OTP click karo, phir <span className="font-mono font-bold">123456</span> (ya koi bhi 6-digit) enter karo.
+              </div>
               <form onSubmit={otpSent ? verifyOtp : (e) => { e.preventDefault(); sendOtp(); }} className="space-y-3" data-testid="phone-form">
                 <div>
                   <Label>Phone number</Label>
@@ -148,6 +152,10 @@ export default function AuthPage() {
                 </div>
                 {otpSent && (
                   <>
+                    <div className="rounded-xl border border-aasha-orange/40 bg-aasha-orangeLight px-3 py-2.5 text-sm">
+                      <div className="font-semibold text-aasha-ink">🧪 Demo mode</div>
+                      <div className="text-aasha-inkSoft text-xs mt-0.5">SMS gateway abhi connect nahi hai. Enter <span className="font-bold text-aasha-orange">any 6-digit code</span> (e.g., <span className="font-mono font-bold">123456</span>) to continue.</div>
+                    </div>
                     <div>
                       <Label>One-time code (any 6 digits)</Label>
                       <Input data-testid="input-otp" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" required />

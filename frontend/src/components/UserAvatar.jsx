@@ -3,7 +3,14 @@ import { initials } from "@/lib/utils";
 
 export function UserAvatar({ user, size = 40, showOnline = false }) {
   const px = `${size}px`;
-  const url = user?.avatar;
+  let url = user?.avatar;
+  // Resolve internal aasha file references to authenticated download URL
+  if (url && typeof url === "string" && url.startsWith("aasha-file://")) {
+    const id = url.replace("aasha-file://", "");
+    const token = (typeof window !== "undefined") ? window.localStorage.getItem("aasha_token") : null;
+    const base = process.env.REACT_APP_BACKEND_URL;
+    url = token && base ? `${base}/api/files/${id}?auth=${encodeURIComponent(token)}` : null;
+  }
   return (
     <div className="relative shrink-0" style={{ width: px, height: px }} data-testid="user-avatar">
       {url ? (

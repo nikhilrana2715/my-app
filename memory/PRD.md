@@ -93,3 +93,13 @@ A WhatsApp-like, lightweight, simple chat app called **Aasha** (आशा — "H
 ### Performance fixes
 - N+1 queries eliminated in `list_conversations` (batch `$in` + aggregation pipeline) and `list_messages` (batch file fetch). Deployment health check: PASS ✅
 
+
+---
+
+## Iteration 3 Fixes (Feb 2026)
+1. **🎙️ Audio/Video calls** — implemented P2P WebRTC with Google STUN servers and WebSocket signaling (`call_offer`, `call_answer`, `call_ice`, `call_end`, `call_reject`). New files: `/app/frontend/src/lib/call.jsx` (CallProvider) + `/app/frontend/src/components/CallModal.jsx`. Wired phone & video buttons in chat header (1-on-1 only).
+2. **⬇️ Downloads now work** — root cause was nested `<button>` inside `<button>` in MessageBubble; replaced outer with `<div>` and added a dedicated "..." action trigger in the corner. Downloads are forced via fetch→blob→`<a download>` click. Save option also added in dropdown menu and on hover overlays for image/video/audio.
+3. **📍 Location → Google Maps** — share now opens `https://www.google.com/maps?q=lat,lng` and the message shows a small static map preview from OpenStreetMap.
+4. **📲 OTP UX clarified** — Phone tab now shows a "Demo" banner explaining that real SMS isn't connected; clicking "Send OTP" auto-fills `123456` so user can verify in one tap.
+5. **🖼️ Profile DP upload** — Profile dialog now has a Camera button on the avatar that uploads the photo via `/api/files/upload`. Stored as `aasha-file://<id>` and `UserAvatar` resolves it to an authenticated download URL (`?auth=<jwt>`) so other users see your DP too.
+
