@@ -1,0 +1,33 @@
+{
+  "summary": "RETEST of 5 user-reported fixes in Aasha — ALL PASS via frontend e2e (16/16 checks). Verified: (1) Phone OTP demo flow auto-fills 123456 and logs in; (2) Location card renders with static OSM map preview and opens https://www.google.com/maps?q=lat,lng in a new tab; (3) File messages download via dropdown 'Save / Download' AND via card click (Playwright captured 'aasha_test_upload.txt' download events twice); (4) Profile DP upload — Camera button (btn-upload-dp), 'Photo uploaded' toast, 'Profile updated' toast, sidebar avatar reflects new <img>; (5) Audio + Video call modals open (data-testid='call-modal') and close cleanly via btn-call-end (getUserMedia error toast 'Could not access mic/camera' is expected in headless env without --use-fake-device, but modal opens via setState('calling') before the await acquireMedia() failure → cleanup() closes it as designed); (6) Clicking inside a text bubble does NOT open the actions dropdown (only the dedicated actions-{msgId} button does). Backend not retested per instructions (already 13/13 in iteration_1).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Composer / btn-send", "issue": "(carry-over from iter2) 'Made with Emergent' badge overlaps btn-send at ~1440px; functional via JS click, cosmetic only.", "selector": "[data-testid=\"btn-send\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_3.json",
+    "/app/test_reports/iteration_2.json",
+    "/app/tests/test_aasha_e2e_iter3.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MessageBubble.jsx — outer container is now a <div> with a dedicated DropdownMenuTrigger button (actions-{msgId}); all media children call e.stopPropagation() correctly so a bubble click no longer triggers the menu. Verified at runtime.",
+    "LocationMsg uses https://www.google.com/maps?q=lat,lng (correct deep-link) and shows OSM static map preview that gracefully hides on error (good defensive UI).",
+    "ProfileDialog.jsx — file is uploaded via /api/files/upload and stored as aasha-file://{id}; UserAvatar resolves via fileUrl(). Working end-to-end including sidebar update after Save.",
+    "AuthPage.jsx Phone tab: prominent demo banner (Hindi + English), auto-fills 123456 after Send OTP, accepts any 6-digit code via /api/auth/otp/verify (mocked).",
+    "call.jsx: setState({status:'calling'}) is called before await acquireMedia(), so CallModal renders even when getUserMedia ultimately fails — cleanup() then closes it. Good UX. Real P2P needs real media devices (out of scope).",
+    "File downloads use fetch→blob→<a download>; works with Playwright expect_download. Both file card and dropdown 'Save / Download' wired correctly."
+  ],
+  "updated_files": ["/app/tests/test_aasha_e2e_iter3.py"],
+  "success_rate": {"backend": "100% (13/13 carry-over from iteration_1, not re-run)", "frontend": "100% (16/16 e2e checks across 2 runs)"},
+  "test_credentials": "alice@example.com / password123 ; bob@example.com / password123 ; phone +919999990099 + OTP 123456 (auto-filled)",
+  "seed_data_creation": "Created in Alice↔Bob DM during e2e: 1 location bubble (lat 12.9, lng 77.6 from previous run + 28.6139, 77.2090 from this), 1 file message 'aasha_test_upload.txt' (32 B), 1 text 'iter3-text-<ts>'. Alice profile photo set to 1x1 transparent PNG via DP upload. Acceptable for preview env.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 5 user-reported fixes verified e2e. Notes for next agent: (a) Radix DropdownMenu action button (actions-{msgId}) is opacity-0 group-hover:opacity-100 — Playwright must HOVER the parent msg-{msgId} first OR use force=True click followed by waiting on [role='menu']. (b) Sonner toasts are NOT inside [data-sonner-toast] li — easiest detection is `await page.evaluate(()=>document.body.innerText)` and substring match. (c) For call modal tests in headless without --use-fake-device-for-media-stream, getUserMedia throws but modal still appears for ~50–200ms because setState('calling') runs before the await — wait_for_selector with timeout 3000ms catches it reliably. (d) Phone OTP /chat redirect creates a phantom user '+91...@phone.aasha.local'; safe to keep. (e) Geolocation must be granted via context.grant_permissions(['geolocation']) AND context.set_geolocation({...}) before Composer→Location triggers navigator.geolocation.getCurrentPosition.",
+  "rca_of_the_issue": "Initial first-pass run had 5 transient FAILs that were ALL test-script issues, not app bugs: (1) Dropdown Save/Download — Radix trigger needs hover-induced opacity to make pointer events register; fixed with msg.hover() then click(force=True). (2) File card click download — was attempted while a previous Radix menu was still open (overlay intercept); fixed by Escape + retry. (3,4) 'Photo uploaded'/'Profile updated' toasts — sonner renders inside [data-sonner-toaster] section, NOT li[role='status']; switched to body.innerText substring match. (5) Video call modal — audio call's cleanup hadn't fully reset state.status to idle in 800ms; fixed by waiting 1000ms + checking for any open modal first. After these test fixes, all 16/16 checks pass deterministically. NO APP CODE CHANGES NEEDED."
+}
