@@ -37,9 +37,18 @@ export default function ChatWindow({ conversation, presence, typing, onBack, soc
         });
       } else if (evt.type === "message_deleted" && evt.conversation_id === conversation.id) {
         setMessages((m) => m.map((x) => x.id === evt.message_id ? { ...x, deleted: true, text: null, file: null } : x));
+      } else if (evt.type === "reaction" && evt.conversation_id === conversation.id) {
+        setMessages((m) => m.map((x) => x.id === evt.message_id ? { ...x, reactions: evt.reactions } : x));
+      } else if (evt.type === "read" && evt.conversation_id === conversation.id) {
+        setMessages((m) => m.map((x) => {
+          if (x.sender_id === user.id && !(x.read_by || []).includes(evt.user_id)) {
+            return { ...x, read_by: [...(x.read_by || []), evt.user_id] };
+          }
+          return x;
+        }));
       }
     });
-  }, [registerMessageHandler, conversation.id]);
+  }, [registerMessageHandler, conversation.id, user.id]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -59,6 +68,8 @@ export default function ChatWindow({ conversation, presence, typing, onBack, soc
   const deleteMessage = async (mid) => {
     try { await api.delete(`/messages/${mid}`); } catch (e) { toast.error(formatErr(e)); }
   };
+
+  const otherMembersCount = (conversation.members?.length || 2) - 1;
 
   return (
     <div className="flex flex-col h-full bg-aasha-bg" data-testid="chat-window">
@@ -105,6 +116,7 @@ export default function ChatWindow({ conversation, presence, typing, onBack, soc
                 showAvatar={showAvatar}
                 onForward={() => onForward(m)}
                 onDelete={() => deleteMessage(m.id)}
+                otherMembersCount={otherMembersCount}
               />
             );
           })

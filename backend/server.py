@@ -449,10 +449,14 @@ async def list_messages(cid: str, before: Optional[str] = None, limit: int = 50,
     msgs = await db.messages.find(q, {"_id": 0}).sort("created_at", -1).limit(min(limit, 100)).to_list(limit)
     msgs.reverse()
     # Mark as read
-    await db.messages.update_many(
+    upd = await db.messages.update_many(
         {"conversation_id": cid, "sender_id": {"$ne": user["id"]}, "read_by": {"$ne": user["id"]}},
         {"$addToSet": {"read_by": user["id"]}}
     )
+    if upd.modified_count > 0:
+        await broadcast_to_members(conv["members"], {
+            "type": "read", "conversation_id": cid, "user_id": user["id"],
+        })
     # Batch: fetch all referenced files in one query
     file_ids = [m["file_id"] for m in msgs if m.get("file_id")]
     files_by_id: Dict[str, dict] = {}
@@ -517,6 +521,59 @@ async def delete_message(mid: str, user=Depends(current_user)):
     conv = await db.conversations.find_one({"id": msg["conversation_id"]}, {"_id": 0})
     if conv:
         await broadcast_to_members(conv["members"], {"type": "message_deleted", "message_id": mid, "conversation_id": msg["conversation_id"]})
+    return {"ok": True}
+
+class ReactionIn(BaseModel):
+    emoji: str
+
+@api.post("/messages/{mid}/react")
+async def react_to_message(mid: str, body: ReactionIn, user=Depends(current_user)):
+    emoji = (body.emoji or "").strip()
+    if not emoji or len(emoji) > 8:
+        raise HTTPException(status_code=400, detail="Invalid emoji")
+    msg = await db.messages.find_one({"id": mid}, {"_id": 0})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    conv = await db.conversations.find_one({"id": msg["conversation_id"], "members": user["id"]}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=403, detail="Not a member")
+    reactions = msg.get("reactions") or {}
+    # Remove user's previous reaction (one reaction per user)
+    for k in list(reactions.keys()):
+        if user["id"] in reactions[k]:
+            reactions[k] = [u for u in reactions[k] if u != user["id"]]
+            if not reactions[k]:
+                del reactions[k]
+    # Toggle: if same emoji, just removed above; otherwise add
+    prev_had = any(user["id"] in v for v in (msg.get("reactions") or {}).values())
+    prev_emoji = next((k for k, v in (msg.get("reactions") or {}).items() if user["id"] in v), None)
+    if not (prev_had and prev_emoji == emoji):
+        reactions.setdefault(emoji, []).append(user["id"])
+    await db.messages.update_one({"id": mid}, {"$set": {"reactions": reactions}})
+    await broadcast_to_members(conv["members"], {
+        "type": "reaction", "message_id": mid,
+        "conversation_id": msg["conversation_id"],
+        "reactions": reactions,
+    })
+    return {"ok": True, "reactions": reactions}
+
+class ReadIn(BaseModel):
+    conversation_id: str
+    message_ids: Optional[List[str]] = None
+
+@api.post("/messages/read")
+async def mark_read(body: ReadIn, user=Depends(current_user)):
+    conv = await db.conversations.find_one({"id": body.conversation_id, "members": user["id"]}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Not found")
+    q: Dict[str, Any] = {"conversation_id": body.conversation_id, "sender_id": {"$ne": user["id"]},
+                          "read_by": {"$ne": user["id"]}}
+    if body.message_ids:
+        q["id"] = {"$in": body.message_ids}
+    await db.messages.update_many(q, {"$addToSet": {"read_by": user["id"]}})
+    await broadcast_to_members(conv["members"], {
+        "type": "read", "conversation_id": body.conversation_id, "user_id": user["id"],
+    })
     return {"ok": True}
 
 # ---------- WebSocket ----------

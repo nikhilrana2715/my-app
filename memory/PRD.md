@@ -82,3 +82,14 @@ A WhatsApp-like, lightweight, simple chat app called **Aasha** (आशा — "H
 - `/app/frontend/src/App.js`, `/app/frontend/src/pages/*`, `/app/frontend/src/components/*`, `/app/frontend/src/lib/*`
 - `/app/frontend/public/manifest.json`
 - `/app/frontend/build/` — production bundle ready
+
+---
+
+## Phase 2 Updates (Feb 2026) — Free features
+- ✅ **Voice notes**: Composer mic button uses MediaRecorder (webm/m4a). Tap mic → recording bar with timer + send/cancel. Uploaded as audio message via existing `/api/files/upload` and rendered with `<audio controls>`.
+- ✅ **Read receipts (✓✓ blue ticks)**: Backend already tracked `read_by`. Added `POST /api/messages/read` + WebSocket `read` broadcast. UI shows: single ✓ (sent), grey ✓✓ (delivered), blue ✓✓ (all read). For groups, blue ticks only when ALL other members have read.
+- ✅ **Reactions**: New endpoint `POST /api/messages/{mid}/react` (toggle, one reaction per user). Quick picker in bubble dropdown with 👍 ❤️ 😂 😮 😢 🙏. Reaction badges shown below bubble with count. Realtime sync via WebSocket `reaction` event.
+
+### Performance fixes
+- N+1 queries eliminated in `list_conversations` (batch `$in` + aggregation pipeline) and `list_messages` (batch file fetch). Deployment health check: PASS ✅
+

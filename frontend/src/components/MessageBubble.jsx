@@ -1,11 +1,14 @@
 import React, { useState } from "react";
-import { fileUrl } from "@/lib/api";
+import { fileUrl, api, formatErr } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { UserAvatar } from "@/components/UserAvatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Forward, Trash2, Copy, Share2, Download, FileText, MapPin, Play } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Forward, Trash2, Copy, Share2, Download, FileText, MapPin, Smile, Check, CheckCheck } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatTime, bytes, linkify } from "@/lib/utils";
 import { toast } from "sonner";
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 function FileCard({ file, isMine }) {
   const url = fileUrl(file.id);
@@ -72,7 +75,8 @@ function LocationMsg({ loc, isMine }) {
   );
 }
 
-export default function MessageBubble({ msg, isMine, showSenderName, showAvatar, onForward, onDelete }) {
+export default function MessageBubble({ msg, isMine, showSenderName, showAvatar, onForward, onDelete, otherMembersCount = 1 }) {
+  const { user } = useAuth();
   if (msg.deleted) {
     return (
       <div className={`flex ${isMine ? "justify-end" : "justify-start"} mb-1.5`}>
@@ -92,6 +96,16 @@ export default function MessageBubble({ msg, isMine, showSenderName, showAvatar,
       navigator.clipboard.writeText(text); toast.success("Copied — paste anywhere to share");
     }
   };
+  const react = async (emoji) => {
+    try { await api.post(`/messages/${msg.id}/react`, { emoji }); }
+    catch (e) { toast.error(formatErr(e)); }
+  };
+
+  // Read receipt logic for own messages
+  const readers = (msg.read_by || []).filter((u) => u !== msg.sender_id);
+  const isRead = isMine && readers.length >= otherMembersCount && otherMembersCount > 0;
+  const reactions = msg.reactions || {};
+  const reactionEntries = Object.entries(reactions).filter(([, arr]) => arr.length > 0);
 
   return (
     <div className={`flex ${isMine ? "justify-end" : "justify-start"} mb-1.5 group`} data-testid={`msg-${msg.id}`}>
@@ -125,12 +139,35 @@ export default function MessageBubble({ msg, isMine, showSenderName, showAvatar,
                   )}
                 </div>
               )}
-              <div className={`text-[10px] mt-1 ${isMine ? "text-white/80" : "text-aasha-inkMuted"} text-right`}>
-                {formatTime(msg.created_at)}
+              <div className={`text-[10px] mt-1 ${isMine ? "text-white/80" : "text-aasha-inkMuted"} text-right flex items-center gap-1 justify-end`}>
+                <span>{formatTime(msg.created_at)}</span>
+                {isMine && (
+                  isRead
+                    ? <CheckCheck className="w-3.5 h-3.5 text-blue-300" data-testid={`tick-read-${msg.id}`} />
+                    : readers.length > 0
+                      ? <CheckCheck className="w-3.5 h-3.5 text-white/80" data-testid={`tick-delivered-${msg.id}`} />
+                      : <Check className="w-3.5 h-3.5 text-white/80" data-testid={`tick-sent-${msg.id}`} />
+                )}
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={isMine ? "end" : "start"}>
+          <DropdownMenuContent align={isMine ? "end" : "start"} className="min-w-[200px]">
+            <div className="flex items-center justify-between gap-1 px-2 py-1.5">
+              {QUICK_REACTIONS.map((emo) => {
+                const mine = (reactions[emo] || []).includes(user?.id);
+                return (
+                  <button
+                    key={emo}
+                    onClick={() => react(emo)}
+                    data-testid={`react-${emo}-${msg.id}`}
+                    className={`text-xl w-9 h-9 rounded-full hover:bg-aasha-orangeLight transition-all hover:scale-110 ${mine ? "bg-aasha-orangeLight" : ""}`}
+                  >
+                    {emo}
+                  </button>
+                );
+              })}
+            </div>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onForward()} data-testid={`forward-${msg.id}`}>
               <Forward className="w-4 h-4 mr-2" /> Forward
             </DropdownMenuItem>
@@ -149,6 +186,25 @@ export default function MessageBubble({ msg, isMine, showSenderName, showAvatar,
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        {reactionEntries.length > 0 && (
+          <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`} data-testid={`reactions-${msg.id}`}>
+            {reactionEntries.map(([emo, users]) => {
+              const mine = users.includes(user?.id);
+              return (
+                <button
+                  key={emo}
+                  onClick={() => react(emo)}
+                  className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all hover:scale-105 ${
+                    mine ? "bg-aasha-orangeLight border-aasha-orange" : "bg-white border-aasha-line"
+                  }`}
+                >
+                  <span>{emo}</span>
+                  <span className="text-aasha-ink font-semibold">{users.length}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
