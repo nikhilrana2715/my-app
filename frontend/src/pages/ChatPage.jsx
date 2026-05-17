@@ -3,6 +3,7 @@ import { api, formatErr } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ChatSocket } from "@/lib/socket";
 import { CallProvider, useCall } from "@/lib/call";
+import { registerPush } from "@/lib/push";
 import Sidebar from "@/components/Sidebar";
 import ChatWindow from "@/components/ChatWindow";
 import EmptyState from "@/components/EmptyState";
@@ -41,6 +42,13 @@ function ChatPageInner() {
   }, []);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  // Register Web Push (one-shot)
+  useEffect(() => {
+    if (!user?.id) return;
+    // Don't block — fire-and-forget. User will see permission prompt once.
+    registerPush().catch(() => {});
+  }, [user?.id]);
 
   // WebSocket
   useEffect(() => {

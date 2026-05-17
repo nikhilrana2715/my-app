@@ -19,6 +19,7 @@ from fastapi.responses import Response as FResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
+from pywebpush import webpush, WebPushException
 
 # ---------- Setup ----------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -33,6 +34,10 @@ JWT_ALG = "HS256"
 APP_NAME = os.environ.get('APP_NAME', 'aasha')
 EMERGENT_KEY = os.environ.get('EMERGENT_LLM_KEY')
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@aasha.app")
 
 storage_key: Optional[str] = None
 
@@ -489,6 +494,25 @@ async def _create_and_broadcast_message(payload: dict, sender: dict) -> dict:
         {"$set": {"last_message": (last or "")[:200], "last_message_at": msg["created_at"]}})
     hydrated = await hydrate_message(msg)
     await broadcast_to_members(conv["members"], {"type": "message", "data": hydrated, "conversation_id": cid})
+    # Push notifications to offline members (best-effort)
+    try:
+        title = sender["name"]
+        if conv.get("is_group") and conv.get("name"):
+            title = f"{sender['name']} in {conv['name']}"
+        body = msg.get("text") or {"image": "📷 Photo", "video": "🎬 Video",
+                                     "audio": "🎙 Voice note", "file": "📎 File",
+                                     "location": "📍 Location"}.get(msg["type"], "New message")
+        for m in conv["members"]:
+            if m == sender["id"]:
+                continue
+            if not manager.is_online(m):
+                asyncio.create_task(send_push_to_user(m, {
+                    "title": title, "body": str(body)[:160],
+                    "tag": f"msg-{cid}", "url": "/chat",
+                    "icon": sender.get("avatar"),
+                }))
+    except Exception as e:
+        logger.error(f"push dispatch error: {e}")
     return hydrated
 
 @api.post("/messages")
@@ -684,6 +708,14 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
                     payload = {**evt, "from": uid, "from_name": user["name"],
                                "from_avatar": user.get("avatar")}
                     await manager.send(target_id, payload)
+                    # Push for incoming call when offline
+                    if t == "call_offer" and not manager.is_online(target_id):
+                        asyncio.create_task(send_push_to_user(target_id, {
+                            "title": "Incoming call",
+                            "body": f"{user['name']} is calling you ({evt.get('kind','audio')})",
+                            "tag": "incoming-call", "url": "/chat",
+                            "icon": user.get("avatar"),
+                        }))
     except WebSocketDisconnect:
         pass
     except Exception as e:
@@ -721,6 +753,56 @@ async def list_calls(user=Depends(current_user)):
 async def root():
     return {"app": "Aasha", "status": "ok", "time": now_iso()}
 
+# ---------- Web Push ----------
+class PushSubIn(BaseModel):
+    endpoint: str
+    keys: Dict[str, Any]
+
+@api.get("/push/public-key")
+async def push_public_key():
+    return {"public_key": VAPID_PUBLIC_KEY}
+
+@api.post("/push/subscribe")
+async def push_subscribe(body: PushSubIn, user=Depends(current_user)):
+    await db.push_subscriptions.update_one(
+        {"user_id": user["id"], "endpoint": body.endpoint},
+        {"$set": {"user_id": user["id"], "endpoint": body.endpoint,
+                   "keys": body.keys, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+@api.post("/push/unsubscribe")
+async def push_unsubscribe(body: PushSubIn, user=Depends(current_user)):
+    await db.push_subscriptions.delete_one({"user_id": user["id"], "endpoint": body.endpoint})
+    return {"ok": True}
+
+async def send_push_to_user(user_id: str, payload: dict):
+    """Best-effort: send push notification to all of user's subscriptions."""
+    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        return
+    subs = await db.push_subscriptions.find({"user_id": user_id}, {"_id": 0}).to_list(20)
+    if not subs:
+        return
+    body_json = json.dumps(payload)
+    dead = []
+    for s in subs:
+        try:
+            webpush(
+                subscription_info={"endpoint": s["endpoint"], "keys": s["keys"]},
+                data=body_json,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_SUBJECT},
+            )
+        except WebPushException as e:
+            status = getattr(e.response, "status_code", 0)
+            if status in (404, 410):
+                dead.append(s["endpoint"])
+        except Exception as e:
+            logger.error(f"push error: {e}")
+    if dead:
+        await db.push_subscriptions.delete_many({"user_id": user_id, "endpoint": {"$in": dead}})
+
 # ---------- Startup ----------
 @app.on_event("startup")
 async def on_start():
@@ -737,6 +819,7 @@ async def on_start():
         await db.call_logs.create_index("caller_id")
         await db.call_logs.create_index("callee_id")
         await db.call_logs.create_index("id", unique=True)
+        await db.push_subscriptions.create_index([("user_id", 1), ("endpoint", 1)], unique=True)
     except Exception as e:
         logger.error(f"Index creation: {e}")
     init_storage()

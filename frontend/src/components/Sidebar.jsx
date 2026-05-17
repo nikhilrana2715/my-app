@@ -4,8 +4,10 @@ import { useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Search, Plus, Users, MessageSquarePlus, MoreVertical, LogOut, User as UserIcon, Sparkles, MessageCircle, Phone } from "lucide-react";
+import { Search, Plus, Users, MessageSquarePlus, MoreVertical, LogOut, User as UserIcon, Sparkles, MessageCircle, Phone, Bell } from "lucide-react";
 import { formatChatTime } from "@/lib/utils";
+import { registerPush } from "@/lib/push";
+import { toast } from "sonner";
 import CallsPanel from "@/components/CallsPanel";
 
 export default function Sidebar({ conversations, activeId, presence, typing, onSelect, onNewChat, onNewGroup, onProfile }) {
@@ -48,6 +50,15 @@ export default function Sidebar({ conversations, activeId, presence, typing, onS
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onProfile} data-testid="menu-profile">
                 <UserIcon className="w-4 h-4 mr-2" /> Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={async () => {
+                const r = await registerPush();
+                if (r.ok) toast.success("Notifications enabled");
+                else if (r.reason === "denied") toast.error("Notifications blocked — enable in browser settings");
+                else if (r.reason === "unsupported") toast.error("Push not supported in this browser");
+                else toast.error("Could not enable notifications");
+              }} data-testid="menu-enable-notifications">
+                <Bell className="w-4 h-4 mr-2" /> Enable notifications
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} data-testid="menu-logout" className="text-destructive">
